@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+from io import StringIO
+from IPython.display import Image
+from sklearn.tree import export_graphviz
 
 
 import matplotlib.pyplot as plt
@@ -11,6 +14,48 @@ import seaborn as sns
 # from sklearn import metrics
 # import pydotplus
 # pd.set_option("display.max_rows", None, "display.max_columns", None)
+
+from sklearn.inspection import permutation_importance
+
+
+rain = pd.read_csv('weather3.csv', index_col='Date')
+rain.dropna(inplace=True)
+
+rain['RainToday'].replace({'No': 0.0, 'Yes': 1.0}, inplace=True)
+rain['RainTomorrow'].replace({'No': 0.0, 'Yes': 1.0}, inplace=True)
+
+rain['Location'] = pd.Categorical(rain['Location'], categories=rain['Location'].unique()).codes
+rain['WindGustDir'] = pd.Categorical(rain['WindGustDir'], categories=rain['WindGustDir'].unique()).codes
+rain['WindDir9am'] = pd.Categorical(rain['WindDir9am'], categories=rain['WindDir9am'].unique()).codes
+rain['WindDir3pm'] = pd.Categorical(rain['WindDir3pm'], categories=rain['WindDir3pm'].unique()).codes
+
+
+X = rain.drop(["RainTomorrow"],axis=1)
+y = rain['RainTomorrow']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3,random_state=1)  # 70% training and 30% test
+clf = DecisionTreeClassifier()
+clf.fit(X_train,y_train)
+
+result = permutation_importance(clf, X, y, n_repeats=10,random_state=0)
+importance = zip(X.columns,result['importances_mean'])
+# summarize feature importance
+for i,v in importance:
+    print('Feature: %s, Score: %.5f' % (i,v))
+# plot feature importance
+print(len(X.columns),[x[1] for x in importance])
+plt.bar(range(len(X.columns)), result['importances_mean'])
+plt.xticks(ticks=range(len(X.columns)),labels=X.columns, rotation=90)
+plt.show()
+
+y_pred = clf.predict(X_test)
+
+print(metrics.classification_report(y_test, y_pred))
+
+dot_data=StringIO()
+export_graphviz(clf,out_file=dot_data,filled=True,rounded=True,feature_names=X.columns,class_names=clf.classes_)
+graph=pydotplus.graph_from_dot_data(dot_data.getvalue())
+graph.write_png('Rain.png')
+Image(graph.create_png())
 
 
 def categorical_feature_to_numerical(df, feature):
